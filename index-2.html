@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fair Queue — Capture Test Harness</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e6e8ee;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  p.subtitle { color: #8a8f9c; font-size: 0.85rem; margin-top: 0; }
+
+  .score-panel {
+    background: #171a23;
+    border: 1px solid #262a37;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 16px 0;
+    text-align: center;
+  }
+  .score-value {
+    font-size: 3rem;
+    font-weight: 700;
+    line-height: 1;
+    transition: color 0.3s;
+  }
+  .score-label { color: #8a8f9c; font-size: 0.8rem; margin-top: 4px; }
+
+  .breakdown {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 16px;
+    font-size: 0.8rem;
+  }
+  .breakdown div { color: #8a8f9c; }
+  .breakdown strong { display: block; color: #e6e8ee; font-size: 1.1rem; }
+
+  .interact-zone {
+    background: #171a23;
+    border: 2px dashed #2e3342;
+    border-radius: 12px;
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #565c6d;
+    font-size: 0.9rem;
+    margin: 16px 0;
+    touch-action: none;
+  }
+
+  form { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+  input {
+    background: #171a23;
+    border: 1px solid #262a37;
+    border-radius: 8px;
+    padding: 12px;
+    color: #e6e8ee;
+    font-size: 1rem;
+  }
+  input:focus { outline: 2px solid #4c7cf0; border-color: transparent; }
+
+  button {
+    background: #4c7cf0;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 600;
+    width: 100%;
+  }
+  button:active { opacity: 0.8; }
+
+  .log-count {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #565c6d;
+    margin-top: 8px;
+  }
+</style>
+</head>
+<body>
+
+<h1>Fair Queue — Capture Harness</h1>
+<p class="subtitle">Move, click, and fill the form below. Score updates live.</p>
+
+<div class="score-panel">
+  <div class="score-value" id="scoreValue">—</div>
+  <div class="score-label">humanness confidence score</div>
+  <div class="breakdown">
+    <div>Movement<strong id="scoreMovement">—</strong></div>
+    <div>Clicks<strong id="scoreClicks">—</strong></div>
+    <div>Form<strong id="scoreForm">—</strong></div>
+  </div>
+</div>
+
+<div class="interact-zone" id="interactZone">
+  Move your mouse / finger here, then click
+</div>
+
+<form id="testForm" onsubmit="return false;">
+  <input type="text" id="name" placeholder="Name" autocomplete="off" />
+  <input type="email" id="email" placeholder="Email" autocomplete="off" />
+  <input type="tel" id="phone" placeholder="Phone" autocomplete="off" />
+</form>
+
+<button id="scoreBtn">Compute Score Now</button>
+<button id="resetBtn" style="background:#262a37; margin-top:8px;">Reset Session</button>
+
+<div class="log-count">
+  <span id="moveCount">movements: 0</span>
+  <span id="clickCount">clicks: 0</span>
+  <span id="formCount">fields: 0</span>
+</div>
+
+<!-- Load modules as plain scripts (StackBlitz-friendly, no bundler needed) -->
+<script src="./src/capture/eventCapture.js"></script>
+<script src="./src/scoring/scoringEngine.js"></script>
+<script>
+  const capture = createEventCapture({ formFieldIds: ["name", "email", "phone"] });
+  capture.attach(document);
+
+  const scoreValueEl = document.getElementById("scoreValue");
+  const scoreMovementEl = document.getElementById("scoreMovement");
+  const scoreClicksEl = document.getElementById("scoreClicks");
+  const scoreFormEl = document.getElementById("scoreForm");
+  const moveCountEl = document.getElementById("moveCount");
+  const clickCountEl = document.getElementById("clickCount");
+  const formCountEl = document.getElementById("formCount");
+
+  function colorForScore(score) {
+    if (score >= 60) return "#4ade80"; // green — human-like
+    if (score >= 30) return "#facc15"; // yellow — uncertain
+    return "#f87171"; // red — bot-like
+  }
+
+  function updateScore() {
+    const log = capture.getEventLog();
+    moveCountEl.textContent = `movements: ${log.movements.length}`;
+    clickCountEl.textContent = `clicks: ${log.clicks.length}`;
+    formCountEl.textContent = `fields: ${log.formEvents.length}`;
+
+    const result = computeHumanScore(log);
+    scoreValueEl.textContent = result.score;
+    scoreValueEl.style.color = colorForScore(result.score);
+    scoreMovementEl.textContent = result.breakdown.movement;
+    scoreClicksEl.textContent = result.breakdown.clickTiming;
+    scoreFormEl.textContent = result.breakdown.formFill;
+  }
+
+  document.getElementById("scoreBtn").addEventListener("click", updateScore);
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    capture.reset();
+    updateScore();
+  });
+
+  // Live-ish updates while interacting with the zone
+  document.getElementById("interactZone").addEventListener("mousemove", () => {
+    updateScore();
+  });
+</script>
+
+</body>
+</html>

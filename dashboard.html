@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Fair Queue — Live Dashboard</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f1117;
+    color: #e6e8ee;
+    margin: 0;
+    padding: 20px;
+    min-height: 100vh;
+  }
+  h1 { font-size: 1.3rem; margin-bottom: 4px; }
+  p.subtitle { color: #8a8f9c; font-size: 0.85rem; margin-top: 0; margin-bottom: 16px; }
+
+  .controls { display: flex; gap: 10px; margin-bottom: 20px; }
+  button {
+    flex: 1;
+    border: none;
+    border-radius: 8px;
+    padding: 14px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: white;
+  }
+  #botRushBtn { background: #ef4444; }
+  #humanJoinBtn { background: #4c7cf0; }
+  button:active { opacity: 0.8; }
+
+  .queue-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .queue-entry {
+    background: #171a23;
+    border: 1px solid #262a37;
+    border-radius: 10px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: transform 0.4s ease, background 0.4s ease;
+  }
+  .queue-entry.flagged {
+    border-color: #4a2020;
+    background: #1e1315;
+  }
+
+  .position {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #565c6d;
+    width: 28px;
+    text-align: center;
+  }
+  .entry-info { flex: 1; }
+  .entry-id { font-size: 0.9rem; font-weight: 600; }
+  .entry-meta { font-size: 0.7rem; color: #8a8f9c; margin-top: 2px; }
+
+  .score-badge {
+    font-size: 0.95rem;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 20px;
+    min-width: 40px;
+    text-align: center;
+  }
+  .score-high { background: rgba(74, 222, 128, 0.15); color: #4ade80; }
+  .score-mid { background: rgba(250, 204, 21, 0.15); color: #facc15; }
+  .score-low { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+
+  .flag { font-size: 0.7rem; color: #f87171; margin-left: 4px; }
+
+  .empty-state { text-align: center; color: #565c6d; padding: 40px 0; font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<h1>Fair Queue — Live Dashboard</h1>
+<p class="subtitle">Higher humanness score = higher queue priority. Watch bots get pushed back.</p>
+
+<div class="controls">
+  <button id="humanJoinBtn">+ Human joins</button>
+  <button id="botRushBtn">⚠ Simulate Bot Rush</button>
+</div>
+
+<div class="queue-list" id="queueList">
+  <div class="empty-state">Queue is empty. Add some entries above.</div>
+</div>
+
+<script src="./src/scoring/scoringEngine.js"></script>
+<script src="./src/scoring/syntheticTraffic.js"></script>
+<script src="./src/queue/queueLogic.js"></script>
+<script>
+  let queue = []; // { requestId, humanScore, arrivalTime }
+  let counter = 0;
+
+  function scoreBadgeClass(score) {
+    if (score >= 60) return "score-high";
+    if (score >= 30) return "score-mid";
+    return "score-low";
+  }
+
+  function render() {
+    const listEl = document.getElementById("queueList");
+    const view = buildQueueView(queue, 30);
+
+    if (view.length === 0) {
+      listEl.innerHTML = '<div class="empty-state">Queue is empty. Add some entries above.</div>';
+      return;
+    }
+
+    listEl.innerHTML = view
+      .map(
+        (entry) => `
+      <div class="queue-entry ${entry.flagged ? "flagged" : ""}">
+        <div class="position">#${entry.position}</div>
+        <div class="entry-info">
+          <div class="entry-id">${entry.requestId}${entry.flagged ? '<span class="flag">🚩 flagged</span>' : ""}</div>
+          <div class="entry-meta">arrived ${new Date(entry.arrivalTime).toLocaleTimeString()}</div>
+        </div>
+        <div class="score-badge ${scoreBadgeClass(entry.humanScore)}">${entry.humanScore}</div>
+      </div>
+    `
+      )
+      .join("");
+  }
+
+  function addEntryFromLog(prefix, eventLog) {
+    counter += 1;
+    const result = computeHumanScore(eventLog);
+    queue.push({
+      requestId: `${prefix}-${counter}`,
+      humanScore: result.score,
+      arrivalTime: Date.now(),
+    });
+  }
+
+  document.getElementById("humanJoinBtn").addEventListener("click", () => {
+    const log = generateHumanLikeEventLog();
+    addEntryFromLog("human", log);
+    render();
+  });
+
+  document.getElementById("botRushBtn").addEventListener("click", () => {
+    // Batch of synthetic bot requests, per PRD 4.5
+    const rushSize = 5;
+    for (let i = 0; i < rushSize; i++) {
+      const log = generateBotLikeEventLog(Date.now() + i);
+      addEntryFromLog("bot", log);
+    }
+    render();
+  });
+
+  render();
+</script>
+
+</body>
+</html>

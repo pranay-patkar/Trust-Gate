@@ -3,170 +3,420 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Fair Queue — Capture Test Harness</title>
+<title>Fair Queue — Signal Reader</title>
 <style>
-  * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    background: #0f1117;
-    color: #e6e8ee;
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: local("JetBrains Mono");
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
     margin: 0;
-    padding: 20px;
+    background: #0B0D12;
+    color: #EDEFF4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     min-height: 100vh;
   }
-  h1 { font-size: 1.3rem; margin-bottom: 4px; }
-  p.subtitle { color: #8a8f9c; font-size: 0.85rem; margin-top: 0; }
 
-  .score-panel {
-    background: #171a23;
-    border: 1px solid #262a37;
-    border-radius: 12px;
-    padding: 20px;
-    margin: 16px 0;
-    text-align: center;
+  .mono {
+    font-family: "JetBrains Mono", "SF Mono", ui-monospace, Menlo, monospace;
   }
-  .score-value {
-    font-size: 3rem;
+
+  .wrap {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 28px 20px 40px;
+  }
+
+  /* ---------- Header ---------- */
+  .eyebrow {
+    font-size: 0.68rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #5A6272;
+    margin-bottom: 6px;
+  }
+  h1 {
+    font-size: 1.5rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0 0 4px;
+  }
+  p.subtitle {
+    color: #8890A0;
+    font-size: 0.85rem;
+    margin: 0 0 22px;
+    line-height: 1.45;
+  }
+
+  /* ---------- Reading panel ---------- */
+  .reading {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    padding: 18px 4px 20px;
+    border-bottom: 1px solid #1C2029;
+    margin-bottom: 18px;
+  }
+  .reading-value {
+    font-size: 3.4rem;
     font-weight: 700;
     line-height: 1;
-    transition: color 0.3s;
+    transition: color 0.4s ease;
+    min-width: 88px;
   }
-  .score-label { color: #8a8f9c; font-size: 0.8rem; margin-top: 4px; }
+  .reading-meta { flex: 1; }
+  .reading-tag {
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: color 0.4s ease;
+  }
+  .reading-sub {
+    font-size: 0.75rem;
+    color: #5A6272;
+    margin-top: 3px;
+  }
 
-  .breakdown {
+  /* ---------- Trace zone: the signature element ---------- */
+  .trace-label-row {
     display: flex;
-    justify-content: space-around;
-    margin-top: 16px;
-    font-size: 0.8rem;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
   }
-  .breakdown div { color: #8a8f9c; }
-  .breakdown strong { display: block; color: #e6e8ee; font-size: 1.1rem; }
+  .trace-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5A6272;
+  }
+  .trace-hint {
+    font-size: 0.72rem;
+    color: #3A4050;
+  }
 
-  .interact-zone {
-    background: #171a23;
-    border: 2px dashed #2e3342;
-    border-radius: 12px;
-    height: 200px;
+  .trace-zone {
+    position: relative;
+    background: #10131A;
+    border: 1px solid #1C2029;
+    border-radius: 14px;
+    height: 220px;
+    overflow: hidden;
+    touch-action: none;
+    margin-bottom: 22px;
+  }
+  .trace-zone svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .trace-placeholder {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #565c6d;
-    font-size: 0.9rem;
-    margin: 16px 0;
-    touch-action: none;
+    color: #3A4050;
+    font-size: 0.82rem;
+    pointer-events: none;
   }
+  .trace-placeholder.hidden { display: none; }
 
-  form { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
-  input {
-    background: #171a23;
-    border: 1px solid #262a37;
-    border-radius: 8px;
-    padding: 12px;
-    color: #e6e8ee;
-    font-size: 1rem;
+  /* ---------- Metric strip ---------- */
+  .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: #1C2029;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
   }
-  input:focus { outline: 2px solid #4c7cf0; border-color: transparent; }
-
-  button {
-    background: #4c7cf0;
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 14px;
-    font-size: 1rem;
+  .metric {
+    background: #10131A;
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .metric-label {
+    font-size: 0.62rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #5A6272;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-size: 1.15rem;
     font-weight: 600;
-    width: 100%;
   }
-  button:active { opacity: 0.8; }
 
-  .log-count {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.75rem;
-    color: #565c6d;
-    margin-top: 8px;
+  /* ---------- Form ---------- */
+  .section-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #5A6272;
+    margin-bottom: 10px;
+  }
+  form { display: flex; flex-direction: column; gap: 9px; margin-bottom: 22px; }
+  input {
+    background: #10131A;
+    border: 1px solid #1C2029;
+    border-radius: 9px;
+    padding: 13px 14px;
+    color: #EDEFF4;
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  input::placeholder { color: #4A5062; }
+  input:focus { outline: none; border-color: #FF6B4A; }
+
+  /* ---------- Controls ---------- */
+  .controls { display: flex; gap: 10px; margin-bottom: 14px; }
+  button {
+    flex: 1;
+    border: none;
+    border-radius: 9px;
+    padding: 14px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    font-family: inherit;
+    color: #0B0D12;
+    background: #EDEFF4;
+  }
+  button:active { transform: scale(0.98); }
+  button.secondary {
+    background: transparent;
+    color: #8890A0;
+    border: 1px solid #1C2029;
+  }
+
+  .footer-note {
+    font-size: 0.72rem;
+    color: #3A4050;
+    text-align: center;
+    line-height: 1.5;
+  }
+
+  .error-banner {
+    background: #2A1512;
+    border: 1px solid #4A2018;
+    color: #FF8A70;
+    padding: 12px 14px;
+    border-radius: 9px;
+    font-size: 0.78rem;
+    margin-bottom: 18px;
   }
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<h1>Fair Queue — Capture Harness</h1>
-<p class="subtitle">Move, click, and fill the form below. Score updates live.</p>
+  <div class="eyebrow">Fair Queue · Signal Reader</div>
+  <h1>Read your own signal</h1>
+  <p class="subtitle">Drag inside the trace zone and fill the form below. Every path you draw is scored for the irregularity only a human produces.</p>
 
-<div class="score-panel">
-  <div class="score-value" id="scoreValue">—</div>
-  <div class="score-label">humanness confidence score</div>
-  <div class="breakdown">
-    <div>Movement<strong id="scoreMovement">—</strong></div>
-    <div>Clicks<strong id="scoreClicks">—</strong></div>
-    <div>Form<strong id="scoreForm">—</strong></div>
+  <div class="reading">
+    <div class="reading-value mono" id="scoreValue">—</div>
+    <div class="reading-meta">
+      <div class="reading-tag" id="scoreTag">AWAITING SIGNAL</div>
+      <div class="reading-sub">humanness confidence, 0–100</div>
+    </div>
   </div>
-</div>
 
-<div class="interact-zone" id="interactZone">
-  Move your mouse / finger here, then click
-</div>
+  <div class="trace-label-row">
+    <div class="trace-label">Trace Zone</div>
+    <div class="trace-hint mono" id="traceHint">0 pts</div>
+  </div>
+  <div class="trace-zone" id="traceZone">
+    <svg id="traceSvg" preserveAspectRatio="none"></svg>
+    <div class="trace-placeholder" id="tracePlaceholder">drag here — mouse or finger</div>
+  </div>
 
-<form id="testForm" onsubmit="return false;">
-  <input type="text" id="name" placeholder="Name" autocomplete="off" />
-  <input type="email" id="email" placeholder="Email" autocomplete="off" />
-  <input type="tel" id="phone" placeholder="Phone" autocomplete="off" />
-</form>
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Motion</div>
+      <div class="metric-value mono" id="metricMovement">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Rhythm</div>
+      <div class="metric-value mono" id="metricClicks">—</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Intent</div>
+      <div class="metric-value mono" id="metricForm">—</div>
+    </div>
+  </div>
 
-<button id="scoreBtn">Compute Score Now</button>
-<button id="resetBtn" style="background:#262a37; margin-top:8px;">Reset Session</button>
+  <div class="section-label">Sample form</div>
+  <form id="testForm" onsubmit="return false;">
+    <input type="text" id="name" placeholder="Name" autocomplete="off" />
+    <input type="email" id="email" placeholder="Email" autocomplete="off" />
+    <input type="tel" id="phone" placeholder="Phone" autocomplete="off" />
+  </form>
 
-<div class="log-count">
-  <span id="moveCount">movements: 0</span>
-  <span id="clickCount">clicks: 0</span>
-  <span id="formCount">fields: 0</span>
+  <div class="controls">
+    <button id="scoreBtn">Read signal</button>
+    <button id="resetBtn" class="secondary">Reset</button>
+  </div>
+
+  <div class="footer-note mono" id="logCount">movements 0 · clicks 0 · fields 0</div>
+
 </div>
 
 <!-- Load modules as plain scripts (StackBlitz-friendly, no bundler needed) -->
 <script src="./src/capture/eventCapture.js"></script>
 <script src="./src/scoring/scoringEngine.js"></script>
 <script>
-  const capture = createEventCapture({ formFieldIds: ["name", "email", "phone"] });
-  capture.attach(document);
+  try {
+    if (typeof createEventCapture === "undefined") {
+      throw new Error("eventCapture.js failed to load — check the script path");
+    }
+    if (typeof computeHumanScore === "undefined") {
+      throw new Error("scoringEngine.js failed to load — check the script path");
+    }
 
-  const scoreValueEl = document.getElementById("scoreValue");
-  const scoreMovementEl = document.getElementById("scoreMovement");
-  const scoreClicksEl = document.getElementById("scoreClicks");
-  const scoreFormEl = document.getElementById("scoreForm");
-  const moveCountEl = document.getElementById("moveCount");
-  const clickCountEl = document.getElementById("clickCount");
-  const formCountEl = document.getElementById("formCount");
+    const capture = createEventCapture({ formFieldIds: ["name", "email", "phone"] });
+    capture.attach(document);
 
-  function colorForScore(score) {
-    if (score >= 60) return "#4ade80"; // green — human-like
-    if (score >= 30) return "#facc15"; // yellow — uncertain
-    return "#f87171"; // red — bot-like
-  }
+    const scoreValueEl = document.getElementById("scoreValue");
+    const scoreTagEl = document.getElementById("scoreTag");
+    const metricMovementEl = document.getElementById("metricMovement");
+    const metricClicksEl = document.getElementById("metricClicks");
+    const metricFormEl = document.getElementById("metricForm");
+    const logCountEl = document.getElementById("logCount");
+    const traceHintEl = document.getElementById("traceHint");
+    const tracePlaceholderEl = document.getElementById("tracePlaceholder");
+    const traceSvg = document.getElementById("traceSvg");
+    const traceZone = document.getElementById("traceZone");
 
-  function updateScore() {
-    const log = capture.getEventLog();
-    moveCountEl.textContent = `movements: ${log.movements.length}`;
-    clickCountEl.textContent = `clicks: ${log.clicks.length}`;
-    formCountEl.textContent = `fields: ${log.formEvents.length}`;
+    // Tag + color read from score, tuned to the palette (coral = alarm, mint = verified)
+    function readingFor(score) {
+      if (score >= 60) return { color: "#3ED9B0", tag: "READS HUMAN" };
+      if (score >= 30) return { color: "#E8B84B", tag: "UNCERTAIN" };
+      return { color: "#FF6B4A", tag: "READS BOT" };
+    }
 
-    const result = computeHumanScore(log);
-    scoreValueEl.textContent = result.score;
-    scoreValueEl.style.color = colorForScore(result.score);
-    scoreMovementEl.textContent = result.breakdown.movement;
-    scoreClicksEl.textContent = result.breakdown.clickTiming;
-    scoreFormEl.textContent = result.breakdown.formFill;
-  }
+    function updateScore() {
+      const log = capture.getEventLog();
+      logCountEl.textContent = `movements ${log.movements.length} · clicks ${log.clicks.length} · fields ${log.formEvents.length}`;
 
-  document.getElementById("scoreBtn").addEventListener("click", updateScore);
-  document.getElementById("resetBtn").addEventListener("click", () => {
-    capture.reset();
+      const result = computeHumanScore(log);
+      const { color, tag } = readingFor(result.score);
+
+      scoreValueEl.textContent = result.score;
+      scoreValueEl.style.color = color;
+      scoreTagEl.textContent = tag;
+      scoreTagEl.style.color = color;
+
+      metricMovementEl.textContent = result.breakdown.movement;
+      metricClicksEl.textContent = result.breakdown.clickTiming;
+      metricFormEl.textContent = result.breakdown.formFill;
+    }
+
+    document.getElementById("scoreBtn").addEventListener("click", updateScore);
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      capture.reset();
+      updateScore();
+      tracePoints.length = 0;
+      traceSvg.innerHTML = "";
+      tracePlaceholderEl.classList.remove("hidden");
+      traceHintEl.textContent = "0 pts";
+    });
+
+    // ---------- Trace zone: draws the actual path being scored ----------
+    // This is the signature element — it makes the abstract "movement entropy"
+    // metric visible as the literal shape of what you just drew.
+    let tracePoints = []; // { x, y, t } in zone-local coords, most recent last
+    const TRACE_MAX_AGE_MS = 2200;
+    const TRACE_MAX_POINTS = 120;
+
+    function zoneLocalPoint(clientX, clientY) {
+      const rect = traceZone.getBoundingClientRect();
+      return { x: clientX - rect.left, y: clientY - rect.top, t: Date.now() };
+    }
+
+    function pushTracePoint(clientX, clientY) {
+      tracePoints.push(zoneLocalPoint(clientX, clientY));
+      if (tracePoints.length > TRACE_MAX_POINTS) tracePoints.shift();
+      tracePlaceholderEl.classList.add("hidden");
+    }
+
+    // Straightness heuristic purely for trail coloring (separate from the
+    // real scorer — this is just a visual cue, not the humanness score itself)
+    function traceColor() {
+      if (tracePoints.length < 4) return "#5A6272";
+      let angleSum = 0;
+      let count = 0;
+      for (let i = 2; i < tracePoints.length; i++) {
+        const a = tracePoints[i - 2], b = tracePoints[i - 1], c = tracePoints[i];
+        const a1 = Math.atan2(b.y - a.y, b.x - a.x);
+        const a2 = Math.atan2(c.y - b.y, c.x - b.x);
+        let diff = Math.abs(a2 - a1);
+        if (diff > Math.PI) diff = 2 * Math.PI - diff;
+        angleSum += diff;
+        count++;
+      }
+      const avg = count ? angleSum / count : 0;
+      // low avg angle change = straight/bot-like -> coral, high = curvy/human -> mint
+      const t = Math.min(1, avg / 0.5);
+      const r = Math.round(255 - t * (255 - 62));
+      const g = Math.round(107 + t * (217 - 107));
+      const bch = Math.round(74 + t * (176 - 74));
+      return `rgb(${r},${g},${bch})`;
+    }
+
+    function renderTrace() {
+      const now = Date.now();
+      tracePoints = tracePoints.filter((p) => now - p.t < TRACE_MAX_AGE_MS);
+
+      if (tracePoints.length < 2) {
+        traceSvg.innerHTML = "";
+        traceHintEl.textContent = `${tracePoints.length} pts`;
+        requestAnimationFrame(renderTrace);
+        return;
+      }
+
+      const color = traceColor();
+      const pathD = tracePoints
+        .map((p, i) => `${i === 0 ? "M" : "L"} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+        .join(" ");
+
+      traceSvg.innerHTML = `<path d="${pathD}" stroke="${color}" stroke-width="2.5" fill="none" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />`;
+      traceHintEl.textContent = `${tracePoints.length} pts`;
+      traceHintEl.style.color = color;
+
+      requestAnimationFrame(renderTrace);
+    }
+    requestAnimationFrame(renderTrace);
+
+    traceZone.addEventListener("mousemove", (e) => {
+      pushTracePoint(e.clientX, e.clientY);
+      updateScore();
+    });
+    traceZone.addEventListener(
+      "touchmove",
+      (e) => {
+        if (e.touches[0]) pushTracePoint(e.touches[0].clientX, e.touches[0].clientY);
+        updateScore();
+      },
+      { passive: true }
+    );
+    traceZone.addEventListener(
+      "touchstart",
+      (e) => {
+        if (e.touches[0]) pushTracePoint(e.touches[0].clientX, e.touches[0].clientY);
+        updateScore();
+      },
+      { passive: true }
+    );
+
     updateScore();
-  });
-
-  // Live-ish updates while interacting with the zone
-  document.getElementById("interactZone").addEventListener("mousemove", () => {
-    updateScore();
-  });
+  } catch (err) {
+    const banner = document.createElement("div");
+    banner.className = "error-banner";
+    banner.textContent = "Error: " + err.message;
+    document.querySelector(".wrap").insertBefore(banner, document.querySelector(".wrap").firstChild.nextSibling);
+  }
 </script>
 
 </body>
